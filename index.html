@@ -3,165 +3,180 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>防犯・撃退システム</title>
-    <link rel="manifest" href="manifest.json">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <link rel="apple-touch-icon" href="icon-192.png">
-    
+    <title>GATE SECURITY AI</title>
     <style>
-        :root { --danger: #ff4444; --success: #06C755; --bg: #1a1a1a; }
+        :root { --danger: #ff4444; --success: #06C755; --bg: #000; }
         body { background: var(--bg); color: white; font-family: sans-serif; margin: 0; padding: 20px; text-align: center; }
         
-        /* 画面切り替え */
+        /* --- LINEブラウザ用：URLコピー案内 --- */
+        #line-notice { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2000; padding: 30px 20px; box-sizing: border-box; }
+        .notice-card { background: #222; padding: 25px; border-radius: 15px; border: 2px solid #555; text-align: left; }
+        .url-box { 
+            background: #000; color: #0f0; padding: 15px; border-radius: 5px; 
+            word-break: break-all; font-family: monospace; font-size: 0.9rem; margin: 15px 0; border: 1px solid #0f0;
+        }
+        .copy-btn { background: #555; color: white; border: none; padding: 10px; width: 100%; border-radius: 5px; font-weight: bold; font-size: 1rem; cursor: pointer; }
+        .step-txt { color: #ffaa00; font-weight: bold; font-size: 1.1rem; margin-top: 20px; }
+
+        /* --- 診断ランプ --- */
+        .status-panel { background: #222; padding: 15px; border-radius: 10px; margin-bottom: 20px; text-align: left; }
+        .status-item { display: flex; align-items: center; margin: 8px 0; font-size: 0.9rem; }
+        .lamp { width: 14px; height: 14px; border-radius: 50%; margin-right: 10px; background: #444; }
+        .lamp.ok { background: var(--success); box-shadow: 0 0 10px var(--success); }
+        .lamp.ng { background: var(--danger); }
+
+        /* --- 緊急画面 --- */
         .screen { display: none; }
         .active { display: block; }
-
-        /* 判定画面のデザイン */
-        .card { background: #333; padding: 15px; border-radius: 10px; margin-bottom: 15px; text-align: left; }
-        select, button { width: 100%; padding: 12px; margin: 10px 0; border-radius: 5px; border: none; font-size: 1rem; }
-        .checkbox-group { display: flex; flex-wrap: wrap; gap: 10px; }
-        .checkbox-item { background: #444; padding: 8px 12px; border-radius: 20px; font-size: 0.8rem; cursor: pointer; }
-        .checkbox-item.selected { background: var(--danger); }
-
-        /* 緊急画面（威嚇モード） */
         #emergency-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 100; padding: 20px; box-sizing: border-box; }
-        .alert-flash { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,0,0,0.2); animation: flash 1s infinite; pointer-events: none; }
-        @keyframes flash { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
-
-        #video-container { width: 100%; height: 50vh; background: #222; border: 2px solid var(--danger); position: relative; overflow: hidden; border-radius: 10px; }
+        #video-container { width: 100%; height: 45vh; background: #111; border: 2px solid var(--danger); position: relative; border-radius: 10px; overflow: hidden; }
         video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
-        .rec-label { position: absolute; top: 10px; left: 10px; color: red; font-weight: bold; animation: flash 0.8s infinite; }
-
-        /* フェイクログ（詐欺師撃退用） */
-        #log-display { background: rgba(0,0,0,0.8); color: #00ff00; font-family: monospace; font-size: 0.7rem; text-align: left; padding: 10px; height: 80px; overflow-y: hidden; border: 1px solid #333; margin-top: 10px; }
-
-        #countdown { font-size: 4rem; font-weight: bold; color: var(--danger); margin: 10px 0; }
-
-        /* ボタン */
-        .btn-red { background: var(--danger); color: white; font-weight: bold; }
-        .btn-green { background: var(--success); color: white; font-weight: bold; }
-        .btn-blue { background: #4444ff; color: white; font-weight: bold; }
+        #log-display { background: #000; color: #0f0; font-family: monospace; font-size: 0.75rem; text-align: left; padding: 10px; height: 90px; border: 1px solid #333; margin: 10px 0; overflow: hidden; line-height: 1.4; }
+        #countdown { font-size: 5rem; font-weight: bold; color: var(--danger); margin: 0; }
+        .btn-main { background: var(--danger); color: white; border: none; padding: 25px; width: 100%; font-size: 1.5rem; font-weight: bold; border-radius: 10px; cursor: pointer; box-shadow: 0 5px 15px rgba(255,0,0,0.3); }
+        .btn-check { background: #007aff; color: white; border: none; padding: 15px; width: 100%; border-radius: 8px; font-weight: bold; margin-top: 10px; }
     </style>
 </head>
 <body>
 
-    <div id="main-screen" class="screen active">
-        <h1>訪問者チェック</h1>
-        <div class="card">
-            <label>▼ 訪問者はどんな人？</label>
-            <select id="visitor-type">
-                <option value="none">選択してください</option>
-                <option value="sales">営業・セールス風</option>
-                <option value="worker">作業着・点検員</option>
-                <option value="official">役所・警察・公共機関</option>
-                <option value="delivery">宅配・郵便</option>
-                <option value="other">その他（私服・不明）</option>
-            </select>
+    <div id="line-notice">
+        <div class="notice-card">
+            <h2 style="color:red; margin-top:0;">⚠️ 注意：このままでは動きません</h2>
+            <p>LINEの中ではカメラや音声が使えないため、<b>Chrome（クローム）</b> または <b>Safari（サファリ）</b> で開き直す必要があります。</p>
+            
+            <p class="step-txt">【手順 1】下のURLをコピーしてください</p>
+            <div id="current-url" class="url-box">取得中...</div>
+            <button class="copy-btn" onclick="copyUrl()">URLをコピーする</button>
+
+            <p class="step-txt">【手順 2】ChromeまたはSafariを起動</p>
+            <p style="font-size:0.9rem;">アプリを一度閉じて、インターネットを見るアプリを開いてください。</p>
+            
+            <p class="step-txt">【手順 3】貼り付けて開く</p>
+            <p style="font-size:0.9rem;">上のアドレスバーに貼り付けて実行してください。</p>
+        </div>
+    </div>
+
+    <div id="main-screen" class="active">
+        <h1 style="color:var(--danger); margin-bottom:5px;">GATE SECURITY AI</h1>
+        <p style="font-size:0.8rem; color:#aaa; margin-bottom:20px;">訪問者撃退・防犯システム</p>
+        
+        <div class="status-panel">
+            <h3 style="margin-top:0; font-size:1rem;">システムの動作確認</h3>
+            <div class="status-item"><div id="lamp-browser" class="lamp"></div> ブラウザ環境: <span id="txt-browser">判定中</span></div>
+            <div class="status-item"><div id="lamp-camera" class="lamp"></div> カメラ記録: <span id="txt-camera">未確認</span></div>
+            <div class="status-item"><div id="lamp-voice" class="lamp"></div> 音声警告: <span id="txt-voice">未確認</span></div>
+            <button class="btn-check" onclick="checkPermissions()">動作確認を開始する (ここをタップ)</button>
         </div>
 
-        <div class="card">
-            <label>▼ 言われたキーワード（複数選択）</label>
-            <div class="checkbox-group" id="keyword-group">
-                <div class="checkbox-item" onclick="toggleTag(this)" data-val="free">無料点検</div>
-                <div class="checkbox-item" onclick="toggleTag(this)" data-val="buy">買い取り</div>
-                <div class="checkbox-item" onclick="toggleTag(this)" data-val="now">今日だけ/今すぐ</div>
-                <div class="checkbox-item" onclick="toggleTag(this)" data-val="card">カード/暗証番号</div>
-                <div class="checkbox-item" onclick="toggleTag(this)" data-val="door">ドア開けて</div>
-            </div>
-        </div>
-
-        <button class="btn-red" onclick="startEmergency()" style="font-size: 1.2rem; padding: 20px;">🚨 すでに家の中にいる / 緊急</button>
-        <p style="color: #888; font-size: 0.8rem;">※緊急ボタンを押すと即座に警告モードに入ります</p>
+        <button class="btn-main" id="start-btn" onclick="startEmergency()" disabled style="opacity:0.3">🚨 警告モード起動</button>
+        <p id="msg" style="font-size:0.8rem; color:#ff4444; margin-top:15px; font-weight:bold;">
+            まず上の青いボタンを押して、<br>全てのランプを緑にしてください。
+        </p>
     </div>
 
     <div id="emergency-screen" class="screen">
-        <div class="alert-flash"></div>
         <div id="video-container">
-            <div class="rec-label">● RECORDING / CLOUD UPLOADING</div>
+            <div style="position:absolute; top:10px; left:10px; color:red; font-weight:bold; background:rgba(0,0,0,0.5); padding:2px 5px;">● RECORDING / 証拠保存中</div>
             <video id="video" autoplay playsinline muted></video>
         </div>
-        
         <div id="log-display"></div>
         <div id="countdown">10</div>
-
-        <div id="emergency-actions" style="display: none;">
-            <button class="btn-green" onclick="sendSOS()">📱 家族にLINE送信</button>
-            <a href="tel:110" class="btn-blue" style="display:block; text-decoration:none; padding:12px; border-radius:5px;">📞 110番通報</a>
-            <button onclick="location.reload()" style="background:none; color:#555; font-size:0.7rem;">キャンセル</button>
+        <div id="actions" style="display:none;">
+            <button onclick="sendSOS()" style="background:var(--success); color:white; width:100%; padding:20px; border:none; border-radius:10px; font-weight:bold; font-size:1.2rem; margin-bottom:15px;">📱 家族へLINE送信</button>
+            <a href="tel:110" style="background:#4444ff; color:white; display:block; padding:20px; text-decoration:none; border-radius:10px; font-weight:bold; font-size:1.2rem;">📞 110番通報</a>
         </div>
     </div>
 
     <script>
-        // タグ選択の制御
-        function toggleTag(el) {
-            el.classList.toggle('selected');
+        // 現在のURLを表示
+        const currentUrl = window.location.href;
+        document.getElementById('current-url').innerText = currentUrl;
+
+        // URLコピー機能
+        function copyUrl() {
+            navigator.clipboard.writeText(currentUrl).then(() => {
+                alert("URLをコピーしました！ChromeやSafariに貼り付けてください。");
+            });
         }
 
-        // フェイクログの追加
+        // LINEブラウザチェック
+        const isLine = /Line/i.test(navigator.userAgent);
+        if (isLine) {
+            document.getElementById('line-notice').style.display = 'block';
+        } else {
+            document.getElementById('lamp-browser').classList.add('ok');
+            document.getElementById('txt-browser').innerText = "正常 (Chrome/Safari)";
+        }
+
+        // 診断と準備
+        async function checkPermissions() {
+            // 音声準備
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance("システム準備完了");
+            u.volume = 0; 
+            window.speechSynthesis.speak(u);
+            document.getElementById('lamp-voice').classList.add('ok');
+            document.getElementById('txt-voice').innerText = "準備OK";
+
+            // カメラチェック
+            try {
+                const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                s.getTracks().forEach(t => t.stop());
+                document.getElementById('lamp-camera').classList.add('ok');
+                document.getElementById('txt-camera').innerText = "許可済み";
+                
+                document.getElementById('start-btn').disabled = false;
+                document.getElementById('start-btn').style.opacity = 1;
+                document.getElementById('msg').style.color = "#0f0";
+                document.getElementById('msg').innerText = "準備完了！緊急時に赤いボタンを押してください。";
+            } catch (err) {
+                document.getElementById('lamp-camera').classList.add('ng');
+                document.getElementById('txt-camera').innerText = "カメラを許可してください";
+                alert("カメラの許可が必要です。画面上の許可ボタンを押すか、設定を確認してください。");
+            }
+        }
+
         function addLog(text) {
             const logBox = document.getElementById('log-display');
-            const p = document.createElement('div');
-            p.textContent = `> ${text}`;
-            logBox.appendChild(p);
+            logBox.innerHTML += `> ${text}<br>`;
             logBox.scrollTop = logBox.scrollHeight;
         }
 
-        // 音声読み上げ
-        function speak(text) {
-            const uttr = new SpeechSynthesisUtterance(text);
-            uttr.lang = "ja-JP";
-            window.speechSynthesis.speak(uttr);
-        }
-
-        // 緊急モード起動
         async function startEmergency() {
-            document.getElementById('main-screen').classList.remove('active');
-            document.getElementById('emergency-screen').classList.add('active');
+            document.getElementById('main-screen').style.display = 'none';
+            document.getElementById('emergency-screen').style.display = 'block';
 
-            // カメラ起動（インカメ）
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                document.getElementById('video').srcObject = stream;
-            } catch (err) {
-                addLog("カメラアクセス拒否。証拠保存モードで継続...");
-            }
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+            document.getElementById('video').srcObject = stream;
 
-            // フェイクログ開始（悪ノリ演出）
-            addLog("広域防犯ネットワークに接続中...");
-            setTimeout(() => addLog("画像解析：不審者データベース照合開始"), 1000);
-            setTimeout(() => addLog("GPS補足：現在地を管轄署へ共有中"), 3000);
-            setTimeout(() => addLog("証拠動画を暗号化してクラウド保存中..."), 5000);
+            const speak = (t) => {
+                const uttr = new SpeechSynthesisUtterance(t);
+                uttr.lang = "ja-JP";
+                window.speechSynthesis.speak(uttr);
+            };
 
-            // 音声警告
-            speak("不当な居座りを検知しました。10秒後に自動通報を行います。直ちに退去してください。");
+            addLog("AI監視システムを緊急起動しました");
+            speak("警告。不当な居座りを検知しました。これより顔画像と位置情報を自動通報します。");
 
-            // カウントダウン
             let count = 10;
             const timer = setInterval(() => {
                 count--;
                 document.getElementById('countdown').innerText = count;
+                if(count === 7) addLog("対象者の顔認証を実行中...");
+                if(count === 4) addLog("警察指令センターへ画像データを転送中...");
                 if (count <= 0) {
                     clearInterval(timer);
                     document.getElementById('countdown').style.display = 'none';
-                    document.getElementById('emergency-actions').style.display = 'block';
+                    document.getElementById('actions').style.display = 'block';
                     addLog("通報待機状態。実行ボタンを有効化しました。");
-                    speak("カウントダウンが終了しました。警察へ通報しますか？");
+                    speak("カウントダウン終了。通報を実行しますか？");
                 }
             }, 1000);
         }
 
-        // LINE SOS送信
         function sendSOS() {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition((pos) => {
-                    const mapUrl = `https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`;
-                    const msg = `【緊急SOS】訪問者が家から帰りません！助けて！現在地:${mapUrl}`;
-                    window.location.href = `https://line.me/R/msg/text/?${encodeURIComponent(msg)}`;
-                }, (err) => {
-                    const msg = `【緊急SOS】訪問者が家から帰りません！助けて！(位置情報取得失敗)`;
-                    window.location.href = `https://line.me/R/msg/text/?${encodeURIComponent(msg)}`;
-                });
-            }
+            const msg = `【緊急SOS】訪問者が家から帰りません！助けて！`;
+            window.location.href = `https://line.me/R/msg/text/?${encodeURIComponent(msg)}`;
         }
     </script>
 </body>
